@@ -89,15 +89,9 @@ export const LoginScreen: React.FC = () => {
     switch (role) {
       case 'Administrateur':
       case 'admin':
-        return { label: 'Administrateur', color: 'bg-purple-100 text-purple-800 border-purple-200' };
-      case 'Gérant':
-      case 'manager':
-        return { label: 'Gérant d’Élevage', color: 'bg-blue-100 text-blue-800 border-blue-200' };
-      case 'Vendeur':
-      case 'seller':
-        return { label: 'Ventes & Caisse', color: 'bg-amber-100 text-amber-800 border-amber-200' };
+        return { label: 'Administrateur / Direction', color: 'bg-purple-100 text-purple-800 border-purple-200' };
       default:
-        return { label: 'Agent Ramassage', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+        return { label: 'Agent Terrain / Ramassage', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
     }
   };
 

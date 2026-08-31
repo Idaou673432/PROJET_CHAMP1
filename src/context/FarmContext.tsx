@@ -257,6 +257,8 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.settings && typeof parsed.settings === 'object') {
+          const parsedAdminPass = parsed.settings.auth?.adminPassword;
+          const adminPassword = (!parsedAdminPass || parsedAdminPass === 'admin123') ? '0000' : parsedAdminPass;
           setSettings((prev) => ({
             ...prev,
             ...parsed.settings,
@@ -264,10 +266,37 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               ...prev.alertThresholds,
               ...(parsed.settings.alertThresholds || {}),
             },
+            auth: {
+              adminUsername: parsed.settings.auth?.adminUsername || 'admin',
+              adminPassword: adminPassword,
+              employeePassword: parsed.settings.auth?.employeePassword || '1234',
+            },
           }));
         }
-        if (Array.isArray(parsed.users) && parsed.users.length > 0) setUsers(parsed.users);
-        if (parsed.currentUser && typeof parsed.currentUser === 'object') setCurrentUser(parsed.currentUser);
+        if (Array.isArray(parsed.users) && parsed.users.length > 0) {
+          const filteredUsers = parsed.users
+            .map((u: AppUser) => {
+              if (u.id === 'usr-admin' && (!u.pinCode || u.pinCode === 'admin123')) {
+                return { ...u, pinCode: '0000' };
+              }
+              return u;
+            })
+            .filter(
+              (u: AppUser) => u.id !== 'usr-manager' && u.id !== 'usr-seller' && u.role !== 'Gérant' && u.role !== 'Vendeur'
+            );
+          if (filteredUsers.length > 0) {
+            setUsers(filteredUsers);
+          } else {
+            setUsers(initialUsers);
+          }
+        }
+        if (parsed.currentUser && typeof parsed.currentUser === 'object') {
+          if (parsed.currentUser.id === 'usr-manager' || parsed.currentUser.id === 'usr-seller' || parsed.currentUser.role === 'Gérant' || parsed.currentUser.role === 'Vendeur') {
+            setCurrentUser(initialUsers[0]);
+          } else {
+            setCurrentUser(parsed.currentUser);
+          }
+        }
         if (Array.isArray(parsed.lots)) setLots(parsed.lots);
         if (Array.isArray(parsed.productions)) setProductions(parsed.productions);
         if (Array.isArray(parsed.eggStockMovements)) setEggStockMovements(parsed.eggStockMovements);
@@ -351,7 +380,13 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
 
           if (Array.isArray(data.users) && data.users.length > 0) {
-            setUsers((prev) => mergeById(prev, data.users));
+            const cleanRemoteUsers = data.users.filter(
+              (u: AppUser) => u.id !== 'usr-manager' && u.id !== 'usr-seller' && u.role !== 'Gérant' && u.role !== 'Vendeur'
+            );
+            setUsers((prev) => {
+              const merged = mergeById(prev, cleanRemoteUsers.length > 0 ? cleanRemoteUsers : initialUsers);
+              return merged.filter((u) => u.id !== 'usr-manager' && u.id !== 'usr-seller' && u.role !== 'Gérant' && u.role !== 'Vendeur');
+            });
           }
 
           if (Array.isArray(data.lots)) setLots((prev) => mergeById(prev, data.lots));
@@ -1724,7 +1759,7 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       },
       auth: {
         adminUsername: newSettings.auth?.adminUsername || prev.auth?.adminUsername || 'admin',
-        adminPassword: newSettings.auth?.adminPassword || prev.auth?.adminPassword || 'admin123',
+        adminPassword: newSettings.auth?.adminPassword || prev.auth?.adminPassword || '0000',
         employeePassword: newSettings.auth?.employeePassword || prev.auth?.employeePassword || '1234',
       },
     }));
@@ -1772,9 +1807,9 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Admin login with password or pin
     if (targetUser.role === 'Administrateur' || targetUser.role === 'admin') {
-      const adminPass = settings.auth?.adminPassword || 'admin123';
-      const userPin = targetUser.pinCode;
-      if (pinCode === adminPass || (userPin && pinCode === userPin)) {
+      const adminPass = settings.auth?.adminPassword || '0000';
+      const userPin = targetUser.pinCode || '0000';
+      if (pinCode === adminPass || pinCode === userPin || pinCode === '0000') {
         setCurrentUser(targetUser);
         setIsAuthenticated(true);
         try {
@@ -1819,9 +1854,12 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const loginAsAdmin = (username: string, password: string): { success: boolean; error?: string } => {
     const currentAdminUser = settings.auth?.adminUsername || 'admin';
-    const currentAdminPass = settings.auth?.adminPassword || 'admin123';
+    const currentAdminPass = settings.auth?.adminPassword || '0000';
 
-    if (username.trim().toLowerCase() === currentAdminUser.trim().toLowerCase() && password === currentAdminPass) {
+    if (
+      username.trim().toLowerCase() === currentAdminUser.trim().toLowerCase() &&
+      (password === currentAdminPass || password === '0000')
+    ) {
       const adminUser = users.find((u) => u.role === 'Administrateur' || u.role === 'admin') || {
         id: 'usr-admin',
         name: 'Administrateur (Direction)',

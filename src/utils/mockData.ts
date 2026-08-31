@@ -33,16 +33,14 @@ export const initialSettings: FarmSettings = {
   },
   auth: {
     adminUsername: 'admin',
-    adminPassword: 'admin123',
+    adminPassword: '0000',
     employeePassword: '1234',
   },
 };
 
 export const initialUsers: AppUser[] = [
-  { id: 'usr-admin', name: 'Administrateur Principal', role: 'Administrateur', email: 'admin@ferme.com', active: true, createdAt: new Date().toISOString() },
-  { id: 'usr-manager', name: 'Gérant / Chef d’Élevage', role: 'Gérant', pinCode: '2024', email: 'gerant@ferme.com', active: true, createdAt: new Date().toISOString() },
+  { id: 'usr-admin', name: 'Administrateur Principal', role: 'Administrateur', pinCode: '0000', email: 'admin@ferme.com', active: true, createdAt: new Date().toISOString() },
   { id: 'usr-employee', name: 'Agent de Ramassage', role: 'Employé', pinCode: '1234', email: 'ramassage@ferme.com', active: true, createdAt: new Date().toISOString() },
-  { id: 'usr-seller', name: 'Commercial / Vendeur', role: 'Vendeur', pinCode: '5678', email: 'ventes@ferme.com', active: true, createdAt: new Date().toISOString() },
 ];
 
 export const initialLots: Lot[] = [];

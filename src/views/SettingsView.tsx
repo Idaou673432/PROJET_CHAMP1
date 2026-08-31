@@ -240,15 +240,9 @@ export const SettingsView: React.FC = () => {
     switch (role) {
       case 'Administrateur':
       case 'admin':
-        return { label: 'Administrateur', color: 'bg-purple-50 text-purple-800 border-purple-200' };
-      case 'Gérant':
-      case 'manager':
-        return { label: 'Gérant d’Élevage', color: 'bg-blue-50 text-blue-800 border-blue-200' };
-      case 'Vendeur':
-      case 'seller':
-        return { label: 'Ventes & Caisse', color: 'bg-amber-50 text-amber-800 border-amber-200' };
+        return { label: 'Administrateur / Direction', color: 'bg-purple-50 text-purple-800 border-purple-200' };
       default:
-        return { label: 'Agent Ramassage', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+        return { label: 'Agent Terrain / Ramassage', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
     }
   };
 
@@ -912,10 +906,8 @@ export const SettingsView: React.FC = () => {
                   onChange={(e) => setUserRole(e.target.value as UserRole)}
                   className="w-full bg-[#F9F9F6] border border-[#D1D1C4] rounded-xl px-3 py-2 text-[#2D2D2D] focus:ring-2 focus:ring-[#5A5A40] focus:outline-none font-medium"
                 >
-                  <option value="Employé">Agent de Ramassage (Terrain : ponte & mortalités)</option>
-                  <option value="Vendeur">Vendeur / Commercial (Ventes, caisse & clients)</option>
-                  <option value="Gérant">Gérant d'Élevage (Stocks, aliment, santé & lots)</option>
-                  <option value="Administrateur">Administrateur (Accès complet & finances)</option>
+                  <option value="Employé">Agent de Ramassage / Employé (Terrain : ponte & mortalités)</option>
+                  <option value="Administrateur">Administrateur / Direction (Accès complet à tous les modules)</option>
                 </select>
               </div>
 
