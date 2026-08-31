@@ -1,0 +1,244 @@
+{
+  "entities": {
+    "farms": {
+      "title": "Farm Info & Settings",
+      "description": "General settings and farm profile",
+      "type": "object",
+      "properties": {
+        "farmName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "currency": { "type": "string" },
+        "eggsPerTray": { "type": "number" },
+        "alertThresholds": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["farmName", "currency", "eggsPerTray"]
+    },
+    "lots": {
+      "title": "Flock Lots",
+      "description": "Flock batches of laying hens",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "arrivalDate": { "type": "string" },
+        "initialCount": { "type": "number" },
+        "breed": { "type": "string" },
+        "ageWeeksAtArrival": { "type": "number" },
+        "currentAgeWeeks": { "type": "number" },
+        "unitCost": { "type": "number" },
+        "supplierName": { "type": "string" },
+        "currentCount": { "type": "number" },
+        "deadCount": { "type": "number" },
+        "soldCount": { "type": "number" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "initialCount", "currentCount", "status"]
+    },
+    "productions": {
+      "title": "Egg Production Harvests",
+      "description": "Daily egg collections counted by alvéoles / plateaux and eggs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "lotId": { "type": "string" },
+        "lotName": { "type": "string" },
+        "traysCollected": { "type": "number" },
+        "extraEggsCollected": { "type": "number" },
+        "eggsTotal": { "type": "number" },
+        "traysCount": { "type": "number" },
+        "eggsBroken": { "type": "number" },
+        "eggsDirty": { "type": "number" },
+        "eggsMarketable": { "type": "number" },
+        "traysMarketable": { "type": "number" },
+        "layingRatePercent": { "type": "number" },
+        "recordedBy": { "type": "string" },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "date", "lotId", "eggsTotal", "eggsMarketable"]
+    },
+    "eggStockMovements": {
+      "title": "Egg Stock Movements",
+      "description": "History of all egg and tray stock ins and outs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "quantityEggs": { "type": "number" },
+        "quantityTrays": { "type": "number" },
+        "balanceAfterEggs": { "type": "number" },
+        "referenceId": { "type": "string" },
+        "notes": { "type": "string" },
+        "recordedBy": { "type": "string" }
+      },
+      "required": ["id", "date", "type", "quantityEggs"]
+    },
+    "feedItems": {
+      "title": "Feed Catalog & Inventory",
+      "description": "Feed stock items tracked in bags (sacs) and kg",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "currentStockKg": { "type": "number" },
+        "currentStockBags": { "type": "number" },
+        "standardBagWeightKg": { "type": "number" },
+        "minThresholdKg": { "type": "number" },
+        "unitCostPerKg": { "type": "number" },
+        "supplierName": { "type": "string" }
+      },
+      "required": ["id", "name", "currentStockKg", "standardBagWeightKg"]
+    },
+    "feedConsumptions": {
+      "title": "Daily Feed Distributions",
+      "description": "Daily feed consumption tracked by bags (sacs) and kg",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "lotId": { "type": "string" },
+        "lotName": { "type": "string" },
+        "feedItemId": { "type": "string" },
+        "feedItemName": { "type": "string" },
+        "bagsCount": { "type": "number" },
+        "quantityKg": { "type": "number" },
+        "hensCount": { "type": "number" },
+        "consumptionPerHenGrams": { "type": "number" },
+        "feedCost": { "type": "number" },
+        "feedCostPerHen": { "type": "number" },
+        "recordedBy": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "date", "lotId", "feedItemId", "bagsCount", "quantityKg"]
+    },
+    "feedPurchases": {
+      "title": "Feed Purchases",
+      "description": "Feed stock replenishment purchases",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "feedItemId": { "type": "string" },
+        "feedItemName": { "type": "string" },
+        "bagsCount": { "type": "number" },
+        "quantityKg": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "supplierName": { "type": "string" }
+      },
+      "required": ["id", "date", "feedItemId", "quantityKg", "totalCost"]
+    },
+    "sales": {
+      "title": "Sales Records",
+      "description": "Sales of trays, eggs, hens, and manure",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "saleNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "productType": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "unitPrice": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "remainingDue": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string" }
+      },
+      "required": ["id", "date", "clientName", "totalAmount"]
+    },
+    "expenses": {
+      "title": "Farm Expenses",
+      "description": "Operational, feed, veterinary and labor expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "expenseNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string" }
+      },
+      "required": ["id", "date", "category", "amount"]
+    },
+    "mortalities": {
+      "title": "Mortality Tracking",
+      "description": "Daily bird mortality tracking per lot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "lotId": { "type": "string" },
+        "deadCount": { "type": "number" },
+        "cause": { "type": "string" }
+      },
+      "required": ["id", "date", "lotId", "deadCount"]
+    },
+    "healthTreatments": {
+      "title": "Health & Vaccines",
+      "description": "Prophylaxis, veterinary treatments and vaccination program",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "lotId": { "type": "string" },
+        "type": { "type": "string" },
+        "productName": { "type": "string" },
+        "status": { "type": "string" },
+        "cost": { "type": "number" }
+      },
+      "required": ["id", "date", "lotId", "productName", "status"]
+    },
+    "clients": {
+      "title": "Clients",
+      "description": "Wholesalers, retailers, restaurants, and individuals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "type": { "type": "string" },
+        "debt": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "description": "Feed suppliers, pullet breeders, vets and packaging",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "debt": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "cashMovements": {
+      "title": "Cash Movements",
+      "description": "Daily cash register flow and bank/cashbox journal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "date", "type", "amount"]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Gestion Poulailler Pondeuses Pro",
+  "description": "Application complète de gestion d'élevage de poules pondeuses : suivi de ponte, stocks d'œufs et aliments, ventes, dépenses, mortalités, santé, caisse et rentabilité.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
