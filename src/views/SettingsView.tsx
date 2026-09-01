@@ -28,6 +28,10 @@ import {
   EyeOff,
   Sparkles,
   Dices,
+  Download,
+  Upload,
+  Database,
+  HardDrive,
 } from 'lucide-react';
 import { useFarm } from '../context/FarmContext';
 import { AppUser, UserRole } from '../types';
@@ -46,6 +50,9 @@ export const SettingsView: React.FC = () => {
     updateAuthCredentials,
     resetAllDataToSample,
     clearAllData,
+    exportDataJSON,
+    importDataJSON,
+    restoreFromIndexedDBBackup,
     syncStatus,
     isFirebaseConnected,
     lastFirebaseSync,
@@ -234,6 +241,68 @@ export const SettingsView: React.FC = () => {
     await syncToFirebaseNow();
     setActionNotice('Synchronisation avec Firebase Firestore effectuée !');
     setTimeout(() => setActionNotice(null), 3000);
+  };
+
+  const handleDownloadBackup = () => {
+    try {
+      const dataStr = exportDataJSON();
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const date = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `sauvegarde_ferme_${farmName.toLowerCase().replace(/\s+/g, '_')}_${date}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setActionNotice('Fichier de sauvegarde téléchargé avec succès sur votre appareil !');
+      setTimeout(() => setActionNotice(null), 3500);
+    } catch (e) {
+      console.error('Download backup failed:', e);
+      alert('Erreur lors du téléchargement de la sauvegarde.');
+    }
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const ok = importDataJSON(content);
+        if (ok) {
+          await syncToFirebaseNow();
+          setActionNotice('Sauvegarde restaurée et synchronisée avec succès !');
+          setTimeout(() => setActionNotice(null), 4000);
+        } else {
+          alert('Le fichier sélectionné est invalide ou corrompu.');
+        }
+      } catch (err) {
+        console.error('Error importing backup:', err);
+        alert('Erreur lors de la lecture du fichier de sauvegarde.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input so user can re-import same file if needed
+    event.target.value = '';
+  };
+
+  const handleRestoreFromLocalIndexedDB = async () => {
+    const confirmation = window.confirm(
+      'Voulez-vous restaurer vos données à partir de la base de secours locale sécurisée (IndexedDB) ?'
+    );
+    if (!confirmation) return;
+
+    const ok = await restoreFromIndexedDBBackup();
+    if (ok) {
+      setActionNotice('Données récupérées avec succès depuis la base locale IndexedDB !');
+      setTimeout(() => setActionNotice(null), 4000);
+    } else {
+      alert('Aucune sauvegarde locale exploitable trouvée dans le cache IndexedDB.');
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -751,6 +820,106 @@ export const SettingsView: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Data Protection, Multi-Layer Persistence & Backup Section */}
+      <div className="p-6 rounded-3xl bg-white border border-[#E5E5DE] shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#434333] font-serif flex items-center gap-2">
+                <span>Sécurité & Persistance des Données (Garantie Zéro Perte)</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-100 text-emerald-800">
+                  Quadruple Protection Active
+                </span>
+              </h3>
+              <p className="text-xs text-[#8A8A6F]">
+                Vos données sont enregistrées en temps réel sur 4 niveaux : Cloud Firestore, IndexedDB local, Double LocalStorage et Sauvegarde Fichier
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Protection badges */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-2xl bg-[#F9F9F6] border border-[#E5E5DE] space-y-1">
+            <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
+              <Cloud className="w-3.5 h-3.5" />
+              <span>1. Cloud Firestore</span>
+            </div>
+            <p className="text-[11px] text-[#434333] leading-snug">
+              Base distante permanente hébergée sur Google Cloud. Synchronise PC et téléphones.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[#F9F9F6] border border-[#E5E5DE] space-y-1">
+            <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
+              <Database className="w-3.5 h-3.5" />
+              <span>2. Cache IndexedDB</span>
+            </div>
+            <p className="text-[11px] text-[#434333] leading-snug">
+              Base locale de votre navigateur avec persistance multi-onglets garantie.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[#F9F9F6] border border-[#E5E5DE] space-y-1">
+            <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
+              <HardDrive className="w-3.5 h-3.5" />
+              <span>3. Double Clé Locale</span>
+            </div>
+            <p className="text-[11px] text-[#434333] leading-snug">
+              Miroir de secours LocalStorage rechargé instantanément en cas de coupure.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[#F9F9F6] border border-[#E5E5DE] space-y-1">
+            <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
+              <Save className="w-3.5 h-3.5" />
+              <span>4. Auto-Sauvegarde</span>
+            </div>
+            <p className="text-[11px] text-[#434333] leading-snug">
+              Sauvegarde automatique à la fermeture d'onglet ou verrouillage d'écran.
+            </p>
+          </div>
+        </div>
+
+        {/* Action Buttons for Backup & Restore */}
+        <div className="pt-2 border-t border-[#E5E5DE] grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Download JSON */}
+          <button
+            type="button"
+            onClick={handleDownloadBackup}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#5A5A40] hover:bg-[#434333] text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
+          >
+            <Download className="w-4 h-4" />
+            <span>Télécharger Sauvegarde Complète (JSON)</span>
+          </button>
+
+          {/* Import JSON */}
+          <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white hover:bg-[#F5F5F0] text-[#5A5A40] border border-[#D1D1C4] text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer text-center">
+            <Upload className="w-4 h-4 text-[#5A5A40]" />
+            <span>Restaurer depuis un Fichier JSON</span>
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleFileImport}
+              className="hidden"
+            />
+          </label>
+
+          {/* Restore IndexedDB */}
+          <button
+            type="button"
+            onClick={handleRestoreFromLocalIndexedDB}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white hover:bg-[#F5F5F0] text-emerald-800 border border-emerald-300 text-xs font-bold shadow-xs active:scale-95 transition-all"
+          >
+            <RotateCcw className="w-4 h-4 text-emerald-700" />
+            <span>Restaurer Secours Local (IndexedDB)</span>
+          </button>
+        </div>
+      </div>
 
       {/* Firebase Cloud Synchronization Section */}
       <div className="p-6 rounded-3xl bg-white border border-[#E5E5DE] shadow-xs space-y-4">

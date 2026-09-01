@@ -35,6 +35,12 @@ import {
 import { getTodayDateString } from '../utils/formatters';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import {
+  saveToIndexedDB,
+  retrieveSafestLocalState,
+  loadFromIndexedDB,
+  hasSubstantialData,
+} from '../utils/storageBackup';
 
 interface FarmContextType {
   // State
@@ -56,11 +62,12 @@ interface FarmContextType {
   currentUser: AppUser;
   users: AppUser[];
 
-  // Firebase Sync State
+  // Firebase Sync & Resilience State
   syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   isFirebaseConnected: boolean;
   lastFirebaseSync: string | null;
   syncToFirebaseNow: () => Promise<boolean>;
+  restoreFromIndexedDBBackup: () => Promise<boolean>;
 
   // Computed KPIs & Aggregates
   totalCurrentHens: number;
@@ -231,6 +238,7 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const lastLocalSavedTimestamp = useRef<string>('');
   const isApplyingRemoteUpdate = useRef<boolean>(false);
+  const isInitialRemoteLoadDone = useRef<boolean>(false);
 
   // Helper to merge local and remote lists without dropping concurrent live additions from other devices
   const mergeById = <T extends { id: string }>(currentItems: T[], remoteItems: T[]): T[] => {
@@ -250,93 +258,89 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return Array.from(map.values());
   };
 
-  // Initialize data from LocalStorage first (clean empty by default)
+  // 1. Initialize data from safest local tier (LocalStorage primary, Backup key, or IndexedDB)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.settings && typeof parsed.settings === 'object') {
-          const parsedAdminPass = parsed.settings.auth?.adminPassword;
-          const adminPassword = (!parsedAdminPass || parsedAdminPass === 'admin123') ? '0000' : parsedAdminPass;
-          setSettings((prev) => ({
-            ...prev,
-            ...parsed.settings,
-            alertThresholds: {
-              ...prev.alertThresholds,
-              ...(parsed.settings.alertThresholds || {}),
-            },
-            auth: {
-              adminUsername: parsed.settings.auth?.adminUsername || 'admin',
-              adminPassword: adminPassword,
-              employeePassword: parsed.settings.auth?.employeePassword || '1234',
-            },
-          }));
-        }
-        if (Array.isArray(parsed.users) && parsed.users.length > 0) {
-          const filteredUsers = parsed.users
-            .map((u: AppUser) => {
-              if (u.id === 'usr-admin' && (!u.pinCode || u.pinCode === 'admin123')) {
-                return { ...u, pinCode: '0000' };
-              }
-              return u;
-            })
-            .filter(
-              (u: AppUser) => u.id !== 'usr-manager' && u.id !== 'usr-seller' && u.role !== 'Gérant' && u.role !== 'Vendeur'
-            );
-          if (filteredUsers.length > 0) {
-            setUsers(filteredUsers);
-          } else {
-            setUsers(initialUsers);
+    let isMounted = true;
+
+    async function loadSafestInitialData() {
+      try {
+        const safestData = await retrieveSafestLocalState(STORAGE_KEY);
+        if (safestData && typeof safestData === 'object' && isMounted) {
+          if (safestData.settings && typeof safestData.settings === 'object') {
+            const parsedAdminPass = safestData.settings.auth?.adminPassword;
+            const adminPassword = (!parsedAdminPass || parsedAdminPass === 'admin123') ? '0000' : parsedAdminPass;
+            setSettings((prev) => ({
+              ...prev,
+              ...safestData.settings,
+              alertThresholds: {
+                ...prev.alertThresholds,
+                ...(safestData.settings.alertThresholds || {}),
+              },
+              auth: {
+                adminUsername: safestData.settings.auth?.adminUsername || 'admin',
+                adminPassword: adminPassword,
+                employeePassword: safestData.settings.auth?.employeePassword || '1234',
+              },
+            }));
           }
-        }
-        if (parsed.currentUser && typeof parsed.currentUser === 'object') {
-          if (parsed.currentUser.id === 'usr-manager' || parsed.currentUser.id === 'usr-seller' || parsed.currentUser.role === 'Gérant' || parsed.currentUser.role === 'Vendeur') {
-            setCurrentUser(initialUsers[0]);
-          } else {
-            setCurrentUser(parsed.currentUser);
+          if (Array.isArray(safestData.users) && safestData.users.length > 0) {
+            const filteredUsers = safestData.users
+              .map((u: AppUser) => {
+                if (u.id === 'usr-admin' && (!u.pinCode || u.pinCode === 'admin123')) {
+                  return { ...u, pinCode: '0000' };
+                }
+                return u;
+              })
+              .filter(
+                (u: AppUser) => u.id !== 'usr-manager' && u.id !== 'usr-seller' && u.role !== 'Gérant' && u.role !== 'Vendeur'
+              );
+            if (filteredUsers.length > 0) {
+              setUsers(filteredUsers);
+            }
           }
+          if (safestData.currentUser && typeof safestData.currentUser === 'object') {
+            if (safestData.currentUser.id === 'usr-manager' || safestData.currentUser.id === 'usr-seller' || safestData.currentUser.role === 'Gérant' || safestData.currentUser.role === 'Vendeur') {
+              setCurrentUser(initialUsers[0]);
+            } else {
+              setCurrentUser(safestData.currentUser);
+            }
+          }
+          if (Array.isArray(safestData.lots)) setLots(safestData.lots);
+          if (Array.isArray(safestData.productions)) setProductions(safestData.productions);
+          if (Array.isArray(safestData.eggStockMovements)) setEggStockMovements(safestData.eggStockMovements);
+          if (Array.isArray(safestData.sales)) setSales(safestData.sales);
+          if (Array.isArray(safestData.feedItems)) setFeedItems(safestData.feedItems);
+          if (Array.isArray(safestData.feedPurchases)) setFeedPurchases(safestData.feedPurchases);
+          if (Array.isArray(safestData.feedConsumptions)) setFeedConsumptions(safestData.feedConsumptions);
+          if (Array.isArray(safestData.expenses)) setExpenses(safestData.expenses);
+          if (Array.isArray(safestData.mortalities)) setMortalities(safestData.mortalities);
+          if (Array.isArray(safestData.healthTreatments)) setHealthTreatments(safestData.healthTreatments);
+          else if (Array.isArray(safestData.vaccines)) setHealthTreatments(safestData.vaccines);
+          if (Array.isArray(safestData.clients)) setClients(safestData.clients);
+          if (Array.isArray(safestData.suppliers)) setSuppliers(safestData.suppliers);
+          if (Array.isArray(safestData.cashMovements)) setCashMovements(safestData.cashMovements);
         }
-        if (Array.isArray(parsed.lots)) setLots(parsed.lots);
-        if (Array.isArray(parsed.productions)) setProductions(parsed.productions);
-        if (Array.isArray(parsed.eggStockMovements)) setEggStockMovements(parsed.eggStockMovements);
-        if (Array.isArray(parsed.sales)) setSales(parsed.sales);
-        if (Array.isArray(parsed.feedItems)) setFeedItems(parsed.feedItems);
-        if (Array.isArray(parsed.feedPurchases)) setFeedPurchases(parsed.feedPurchases);
-        if (Array.isArray(parsed.feedConsumptions)) setFeedConsumptions(parsed.feedConsumptions);
-        if (Array.isArray(parsed.expenses)) setExpenses(parsed.expenses);
-        if (Array.isArray(parsed.mortalities)) setMortalities(parsed.mortalities);
-        if (Array.isArray(parsed.healthTreatments)) setHealthTreatments(parsed.healthTreatments);
-        else if (Array.isArray(parsed.vaccines)) setHealthTreatments(parsed.vaccines);
-        if (Array.isArray(parsed.clients)) setClients(parsed.clients);
-        if (Array.isArray(parsed.suppliers)) setSuppliers(parsed.suppliers);
-        if (Array.isArray(parsed.cashMovements)) setCashMovements(parsed.cashMovements);
-      } else {
-        // Zero / clean new installation
-        setLots([]);
-        setProductions([]);
-        setEggStockMovements([]);
-        setSales([]);
-        setFeedItems([]);
-        setFeedPurchases([]);
-        setFeedConsumptions([]);
-        setExpenses([]);
-        setMortalities([]);
-        setHealthTreatments([]);
-        setClients([]);
-        setSuppliers([]);
-        setCashMovements([]);
+      } catch (e) {
+        console.error('Failed to load safest local state:', e);
+      } finally {
+        if (isMounted) {
+          setIsLoaded(true);
+        }
       }
-    } catch (e) {
-      console.error('Failed to load local storage:', e);
     }
-    setIsLoaded(true);
+
+    loadSafestInitialData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Firebase Firestore Continuous Realtime Subscription & Live Multi-Device Sync
+  // 2. Firebase Firestore Continuous Realtime Subscription & Live Multi-Device Sync
   useEffect(() => {
     if (!db) {
       setSyncStatus('offline');
+      isInitialRemoteLoadDone.current = true;
       return;
     }
 
@@ -362,6 +366,7 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (data.updatedAt && data.updatedAt === lastLocalSavedTimestamp.current) {
             setLastFirebaseSync(new Date().toLocaleTimeString('fr-FR'));
             setSyncStatus('synced');
+            isInitialRemoteLoadDone.current = true;
             return;
           }
 
@@ -403,23 +408,30 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (Array.isArray(data.suppliers)) setSuppliers((prev) => mergeById(prev, data.suppliers));
           if (Array.isArray(data.cashMovements)) setCashMovements((prev) => mergeById(prev, data.cashMovements));
 
+          // Immediately back up to IndexedDB and LocalStorage
+          saveToIndexedDB(data);
+
           setLastFirebaseSync(new Date().toLocaleTimeString('fr-FR'));
           setSyncStatus('synced');
+          isInitialRemoteLoadDone.current = true;
         } else {
+          // Remote doc is empty on brand new farm project
           setSyncStatus('synced');
+          isInitialRemoteLoadDone.current = true;
         }
       },
       (error) => {
-        console.warn('Firebase sync warning:', error);
+        console.warn('Firebase sync warning (relying on robust offline IndexedDB cache):', error);
         setSyncStatus('offline');
         setIsFirebaseConnected(false);
+        isInitialRemoteLoadDone.current = true;
       }
     );
 
     return () => unsubscribe();
   }, []);
 
-  // Fast live save to Firestore and LocalStorage
+  // 3. Multi-Layer Live Save (LocalStorage + IndexedDB + Firestore Cloud)
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -444,12 +456,13 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updatedAt: timestamp,
     };
 
-    // Always update LocalStorage immediately for instant offline resilience
+    // Layer 1 & 2: LocalStorage Primary + Redundant IndexedDB Store (Instant, synchronous & offline resilient)
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
-      console.error('Failed to save to localStorage', e);
+      console.error('Failed to save to primary localStorage', e);
     }
+    saveToIndexedDB(stateToSave);
 
     // If this state update originated from an incoming remote Firestore snapshot, do not echo it back
     if (isApplyingRemoteUpdate.current) {
@@ -458,6 +471,11 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     if (!db) return;
+
+    // Safety guard: if initial remote data hasn't loaded yet and local state is empty, do NOT overwrite Firestore with blank data!
+    if (!isInitialRemoteLoadDone.current && !hasSubstantialData(stateToSave)) {
+      return;
+    }
 
     setSyncStatus('syncing');
     lastLocalSavedTimestamp.current = timestamp;
@@ -478,6 +496,63 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => clearTimeout(timer);
   }, [
     isLoaded,
+    settings,
+    users,
+    currentUser,
+    lots,
+    productions,
+    eggStockMovements,
+    sales,
+    feedItems,
+    feedPurchases,
+    feedConsumptions,
+    expenses,
+    mortalities,
+    healthTreatments,
+    clients,
+    suppliers,
+    cashMovements,
+  ]);
+
+  // 4. Emergency auto-flush on tab close / device lock
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const stateToSave = {
+        settings,
+        users,
+        currentUser,
+        lots,
+        productions,
+        eggStockMovements,
+        sales,
+        feedItems,
+        feedPurchases,
+        feedConsumptions,
+        expenses,
+        mortalities,
+        healthTreatments,
+        clients,
+        suppliers,
+        cashMovements,
+        updatedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        saveToIndexedDB(stateToSave);
+      } catch {}
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        handleBeforeUnload();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [
     settings,
     users,
     currentUser,
@@ -519,6 +594,7 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         cashMovements,
         updatedAt: new Date().toISOString(),
       };
+      saveToIndexedDB(stateToSave);
       const farmDocRef = doc(db, 'farms', 'main_farm_data');
       await setDoc(farmDocRef, stateToSave, { merge: true });
       setSyncStatus('synced');
@@ -528,6 +604,42 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {
       console.error('Manual sync failed:', e);
       setSyncStatus('error');
+      return false;
+    }
+  };
+
+  const restoreFromIndexedDBBackup = async (): Promise<boolean> => {
+    try {
+      const backupData: any = await loadFromIndexedDB();
+      if (!backupData || !hasSubstantialData(backupData)) {
+        return false;
+      }
+
+      isApplyingRemoteUpdate.current = true;
+      if (backupData.settings) setSettings(backupData.settings);
+      if (Array.isArray(backupData.users)) setUsers(backupData.users);
+      if (Array.isArray(backupData.lots)) setLots(backupData.lots);
+      if (Array.isArray(backupData.productions)) setProductions(backupData.productions);
+      if (Array.isArray(backupData.eggStockMovements)) setEggStockMovements(backupData.eggStockMovements);
+      if (Array.isArray(backupData.sales)) setSales(backupData.sales);
+      if (Array.isArray(backupData.feedItems)) setFeedItems(backupData.feedItems);
+      if (Array.isArray(backupData.feedPurchases)) setFeedPurchases(backupData.feedPurchases);
+      if (Array.isArray(backupData.feedConsumptions)) setFeedConsumptions(backupData.feedConsumptions);
+      if (Array.isArray(backupData.expenses)) setExpenses(backupData.expenses);
+      if (Array.isArray(backupData.mortalities)) setMortalities(backupData.mortalities);
+      if (Array.isArray(backupData.healthTreatments)) setHealthTreatments(backupData.healthTreatments);
+      if (Array.isArray(backupData.clients)) setClients(backupData.clients);
+      if (Array.isArray(backupData.suppliers)) setSuppliers(backupData.suppliers);
+      if (Array.isArray(backupData.cashMovements)) setCashMovements(backupData.cashMovements);
+
+      // Re-sync this restored data to cloud
+      if (db) {
+        const farmDocRef = doc(db, 'farms', 'main_farm_data');
+        await setDoc(farmDocRef, backupData, { merge: true });
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to restore from IndexedDB:', err);
       return false;
     }
   };
@@ -2115,6 +2227,7 @@ export const FarmProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isFirebaseConnected,
         lastFirebaseSync,
         syncToFirebaseNow,
+        restoreFromIndexedDBBackup,
 
         totalCurrentHens,
         totalInitialHens,
